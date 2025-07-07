@@ -198,7 +198,7 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
     should_get_boost = (
         not is_home_compostable and  # Not home-compostable certified
         home_fraction_in_blend > 0 and  # There are home-compostable materials in blend
-        (is_medium_disintegration_polymer(polymer) or 'PLA' in polymer.upper())  # Medium disintegrating or PLA
+        is_medium_disintegration_polymer(polymer)  # Only medium disintegrating polymers (removed PLA)
     )
     
     if is_home_compostable:
@@ -228,24 +228,21 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
             
             # Apply synergistic boost if eligible
             if should_get_boost:
-                # Calculate boost based on home-compostable fraction
-                if home_fraction_in_blend >= 0.9:
-                    # High home-compostable fraction: moderate boost
-                    max_boost = 15  # Max 15% increase in disintegration
-                    k_boost = 1.2   # 20% faster kinetics
-                    t0_boost = 0.9  # 10% earlier onset
-                else:
-                    # Lower home-compostable fraction: stronger boost
-                    max_boost = 25  # Max 25% increase in disintegration
-                    k_boost = 1.4   # 40% faster kinetics
-                    t0_boost = 0.8  # 20% earlier onset
+                # Use home-compostable kinetics but with proportional max disintegration boost
+                base_k = 0.08
+                base_t0 = 70
                 
-                # Apply boosts
-                max_disintegration = min(max_disintegration + max_boost, 95)  # Cap at 95%
-                k = k * k_boost
-                t0 = t0 * t0_boost
+                # Apply thickness effect like home-compostable materials
+                thickness_factor = (thickness_val / 1.0) ** 0.1
+                k = base_k * thickness_factor
+                t0 = base_t0 / thickness_factor
                 
-                print(f"    Synergistic boost applied to {polymer} {grade}: +{max_boost:.1f}% max, {k_boost:.1f}x faster, {t0_boost:.1f}x earlier onset")
+                # Proportional max disintegration boost based on home-compostable fraction
+                max_boost_percent = 20  # Maximum 20% boost
+                actual_boost = max_boost_percent * home_fraction_in_blend  # Proportional to home fraction
+                max_disintegration = min(max_disintegration + actual_boost, 95)  # Cap at 95%
+                
+                print(f"    Synergistic boost applied to {polymer} {grade}: +{actual_boost:.1f}% max ({home_fraction_in_blend:.1%} of max), using home-compostable kinetics")
             
             y = sigmoid(t, max_disintegration, k, t0)
         
