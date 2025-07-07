@@ -20,7 +20,7 @@ Access the live application: [Coming Soon - Deploy to Streamlit Cloud]
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/erthos-Inc/Home-Compostability.git
+   git clone https://github.com/amerelsamman/Home-Compostability.git
    cd Home-Compostability
    ```
 
