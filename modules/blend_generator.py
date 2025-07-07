@@ -4,7 +4,7 @@ from scipy.stats import dirichlet
 from .core_model import (
     sus, DAYS, SAMPLE_AREA, THICKNESS_DEFAULT,
     generate_material_curve, generate_material_curve_with_synergistic_boost, parse_thickness, find_material_by_grade,
-    parse_blend_input, is_home_compostable_certified, is_medium_disintegration_polymer
+    parse_blend_input, is_home_compostable_certified, is_medium_disintegration_polymer, GLOBAL_SEED
 )
 
 def generate_blend(blend_str):
@@ -32,20 +32,27 @@ def generate_blend(blend_str):
     # Calculate home-compostable fraction in the blend
     home_fraction = sum(mat['vol_frac'] for mat in material_info if is_home_compostable_certified(mat['tuv_home']))
     
-    # Generate curves with synergistic effects
-    for material in material_info:
+    # Generate curves with synergistic effects using material-specific seeds
+    for i, material in enumerate(material_info):
+        # Create a deterministic seed for each material based on its grade
+        material_seed = hash(material['grade']) % 2**32
+        
         material['curve'] = generate_material_curve_with_synergistic_boost(
             material['polymer'],
             material['grade'],
             material['tuv_home'],
             material['thickness'],
-            home_fraction
+            home_fraction,
+            material_seed=material_seed
         )
     
     # Calculate blend curve
     blend_curve = np.zeros(DAYS)
     for material in material_info:
         blend_curve += material['curve'] * material['vol_frac']
+    
+    # Set seed for blend curve monotonicity
+    np.random.seed(GLOBAL_SEED + 3000)  # Offset for blend curve adjustments
     
     # Ensure blend curve is monotonically increasing
     for i in range(1, len(blend_curve)):
@@ -54,6 +61,9 @@ def generate_blend(blend_str):
     
     # No clipping - let sigmoid handle everything naturally
     blend_curve = np.clip(blend_curve, 0, None)
+    
+    # Reset to global seed
+    np.random.seed(GLOBAL_SEED)
     
     return material_info, blend_curve
 
@@ -120,6 +130,9 @@ def generate_random_blends(num_blends, max_materials):
     # STEP 1: Generate all homopolymers (single materials) first
     print(f"\n=== STEP 1: Generating {len(available_materials)} homopolymers ===")
     for material_idx, material in enumerate(available_materials):
+        # Create deterministic seed for homopolymer
+        material_seed = hash(material['grade']) % 2**32
+        
         # Single material with 100% volume fraction
         material_info = [{
             'polymer': material['polymer'],
@@ -129,7 +142,8 @@ def generate_random_blends(num_blends, max_materials):
                 material['polymer'],
                 material['grade'],
                 material['tuv_home'],
-                material['thickness']
+                material['thickness'],
+                material_seed=material_seed
             ),
             'tuv_home': material['tuv_home'],
             'thickness': material['thickness']
@@ -182,6 +196,10 @@ def generate_random_blends(num_blends, max_materials):
     # STEP 2: Generate random blends
     print(f"\n=== STEP 2: Generating {num_blends} random blends ===")
     for blend_idx in range(num_blends):
+        # Set seed for this specific blend
+        blend_seed = GLOBAL_SEED + 4000 + blend_idx
+        np.random.seed(blend_seed)
+        
         # Randomly choose number of materials (2 to max_materials for blends)
         num_materials = np.random.randint(2, max_materials + 1)
         
@@ -192,17 +210,26 @@ def generate_random_blends(num_blends, max_materials):
         alpha = np.ones(num_materials)  # Uniform Dirichlet distribution
         volume_fractions = dirichlet.rvs(alpha, size=1)[0]
         
+        # Calculate home-compostable fraction for synergistic effects
+        home_fraction = sum(vol_frac for i, vol_frac in enumerate(volume_fractions) 
+                           if is_home_compostable_certified(selected_materials[i]['tuv_home']))
+        
         # Generate blend curve
         blend_curve = np.zeros(DAYS)
         material_info = []
         
         for i, material in enumerate(selected_materials):
-            # Generate individual material curve
-            curve = generate_material_curve(
+            # Create deterministic seed for each material in this blend
+            material_seed = hash(f"{material['grade']}_{blend_idx}") % 2**32
+            
+            # Generate individual material curve with synergistic effects
+            curve = generate_material_curve_with_synergistic_boost(
                 material['polymer'],
                 material['grade'],
                 material['tuv_home'],
-                material['thickness']
+                material['thickness'],
+                home_fraction,
+                material_seed=material_seed
             )
             
             material_info.append({
@@ -216,10 +243,8 @@ def generate_random_blends(num_blends, max_materials):
             
             blend_curve += curve * volume_fractions[i]
         
-        # Recalculate blend curve
-        blend_curve = np.zeros(DAYS)
-        for material in material_info:
-            blend_curve += material['curve'] * material['vol_frac']
+        # Set seed for blend curve monotonicity
+        np.random.seed(blend_seed + 1000)
         
         # Ensure blend curve is monotonically increasing
         for i in range(1, len(blend_curve)):
@@ -271,4 +296,6 @@ def generate_random_blends(num_blends, max_materials):
         if (blend_idx + 1) % 10 == 0:
             print(f"Generated {blend_idx + 1}/{num_blends} blends")
     
+    # Reset to global seed
+    np.random.seed(GLOBAL_SEED)
     return all_blend_data 

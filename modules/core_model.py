@@ -4,8 +4,17 @@ import re
 from scipy.stats import dirichlet
 
 # --- GLOBAL SEED FOR REPRODUCIBILITY ---
-np.random.seed(42)
-print("🌱 Set global seed to 42 for reproducible results")
+GLOBAL_SEED = 42
+
+def set_global_seed(seed=None):
+    """Set global seed for all random operations"""
+    if seed is None:
+        seed = GLOBAL_SEED
+    np.random.seed(seed)
+    print(f"🌱 Set global seed to {seed} for reproducible results")
+
+# Set initial seed
+set_global_seed(GLOBAL_SEED)
 
 # --- CONFIGURABLE PARAMETERS ---
 DAYS = 200  # Number of days for the time series
@@ -86,24 +95,32 @@ def is_medium_disintegration_polymer(polymer):
     low_disintegration = ['LDPE', 'PP', 'EVOH', 'PA', 'PET', 'PVDC', 'Bio-PE', 'PLA']
     return not any(x in polymer.upper() for x in low_disintegration)
 
-def get_max_disintegration_hybrid(polymer, tuv_home, thickness_val):
+def get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed=None):
     """Determine maximum disintegration percentage: TUV Home certification takes priority, then polymer type"""
+    # Set seed for this specific material if provided
+    if material_seed is not None:
+        np.random.seed(material_seed)
+    
     # First check TUV Home certification
     is_home_certified = is_home_compostable_certified(tuv_home)
     
     if is_home_certified:
         # Home-compostable certified materials: 90-95% max disintegration
-        return np.random.uniform(90, 95)
+        result = np.random.uniform(90, 95)
     else:
         # Not home-compostable certified - use polymer type classification
         if is_low_disintegration_polymer(polymer):
-            return np.random.uniform(0.5, 2)
+            result = np.random.uniform(0.5, 2)
         elif is_medium_disintegration_polymer(polymer):
-            return np.random.uniform(30, 80)
+            result = np.random.uniform(30, 80)
         else:
-            return np.random.uniform(10, 30)
+            result = np.random.uniform(10, 30)
+    
+    # Reset to global seed
+    np.random.seed(GLOBAL_SEED)
+    return result
 
-def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS):
+def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, material_seed=None):
     """Generate disintegration curve for a single material based ONLY on TUV Home certification"""
     t = np.arange(1, days+1)
     
@@ -125,13 +142,13 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS):
         t0 = base_t0 / thickness_factor
         
         # Use hybrid maximum disintegration (certification takes priority)
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val)
+        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         y = sigmoid(t, max_disintegration, k, t0)
         
         print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% - Thickness: {thickness_val:.3f}mm")
     else:
         # Not home-compostable certified: use hybrid classification
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val)
+        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         
         if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
             y = np.full_like(t, max_disintegration)
@@ -141,6 +158,10 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS):
             y = sigmoid(t, max_disintegration, k, t0)
         
         print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
+    
+    # Set seed for noise generation
+    if material_seed is not None:
+        np.random.seed(material_seed + 1000)  # Offset for noise
     
     # Add very small noise for minimal realism (much reduced noise)
     y = y + np.random.normal(0, 0.1, size=y.shape)
@@ -158,9 +179,11 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS):
         print(f"    ERROR: NaN values in curve for {polymer} {grade}. Using flat curve at 2%.")
         y = np.full_like(t, 2.0)
     
+    # Reset to global seed
+    np.random.seed(GLOBAL_SEED)
     return y
 
-def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thickness_val, home_fraction_in_blend, days=DAYS):
+def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thickness_val, home_fraction_in_blend, days=DAYS, material_seed=None):
     """Generate disintegration curve for a single material with synergistic boost from home-compostable materials"""
     t = np.arange(1, days+1)
     
@@ -189,13 +212,13 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
         t0 = base_t0 / thickness_factor
         
         # Use hybrid maximum disintegration (certification takes priority)
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val)
+        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         y = sigmoid(t, max_disintegration, k, t0)
         
         print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% - Thickness: {thickness_val:.3f}mm")
     else:
         # Not home-compostable certified: use hybrid classification
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val)
+        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         
         if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
             y = np.full_like(t, max_disintegration)
@@ -228,6 +251,10 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
         
         print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
     
+    # Set seed for noise generation
+    if material_seed is not None:
+        np.random.seed(material_seed + 2000)  # Offset for synergistic noise
+    
     # Add very small noise for minimal realism (much reduced noise)
     y = y + np.random.normal(0, 0.1, size=y.shape)
     
@@ -244,6 +271,8 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
         print(f"    ERROR: NaN values in curve for {polymer} {grade}. Using flat curve at 2%.")
         y = np.full_like(t, 2.0)
     
+    # Reset to global seed
+    np.random.seed(GLOBAL_SEED)
     return y
 
 def parse_thickness(thickness_cert):
