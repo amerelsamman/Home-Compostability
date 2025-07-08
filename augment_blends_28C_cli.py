@@ -115,6 +115,10 @@ def run_streamlit_app():
     </style>
     """, unsafe_allow_html=True)
     
+    # Initialize session state
+    if 'plot_generated' not in st.session_state:
+        st.session_state['plot_generated'] = False
+    
     # Professional header
     st.markdown('<h1 class="main-header">🌱 Polymer Blend Disintegration Model</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advanced physics-based modeling for home-compostable polymer blends at 28°C</p>', unsafe_allow_html=True)

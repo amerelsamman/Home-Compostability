@@ -40,7 +40,7 @@ def generate_custom_blend_curves(blend_strings, output_filename):
     if custom_blend_curves:
         import matplotlib as mpl
         plt.close('all')
-        fig, ax = plt.subplots(figsize=(12, 8), facecolor='#000000')
+        fig, ax = plt.subplots(figsize=(10, 6), facecolor='#000000')
         ax.set_facecolor('#000000')
         
         colors = ['#8942E5']  # Use only the specified purple
@@ -48,7 +48,7 @@ def generate_custom_blend_curves(blend_strings, output_filename):
             color = colors[i % len(colors)]
             x = np.arange(1, DAYS+1)
             y = curve
-            ax.plot(x, y, label=label, linewidth=2, color=color)
+            ax.plot(x, y, label=label, linewidth=4, color=color)
             print(f"Plotted: {label} (max: {np.max(y):.1f}%, 90d: {y[89]:.1f}%)")
         # Set axis and title colors
         ax.tick_params(colors='white', which='both')
@@ -56,12 +56,21 @@ def generate_custom_blend_curves(blend_strings, output_filename):
             spine.set_color('white')
         ax.xaxis.label.set_color('white')
         ax.yaxis.label.set_color('white')
-        ax.title.set_color('white')
-        ax.set_xlabel('Time (day)', color='white')
-        ax.set_ylabel('Biodegradation %', color='white')
-        ax.set_title('Biodegradation vs. Time', color='white', fontsize=18, weight='bold')
+        # Set concise title using only polymer names
+        if len(custom_blend_curves) == 1 and len(material_info) > 0:
+            polymer_names = [mat['polymer'] for mat in material_info]
+            blend_name = "/".join(polymer_names)
+            blend_title = f"Rate of Disintegration of {blend_name} blend"
+        else:
+            blend_title = "Rate of Disintegration of Custom Blend"
+        ax.set_title(blend_title, color='white', fontsize=18, weight='bold')
         ax.grid(False)
         ax.set_ylim(0, 105)
+        ax.set_xlabel('Time (day)', color='white')
+        ax.set_ylabel('Disintegration (%)', color='white')
+        # Remove top and right spines for open graph look
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         plt.tight_layout()
         # No legend for clean look
         plt.savefig(output_filename, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
