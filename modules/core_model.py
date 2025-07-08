@@ -95,6 +95,18 @@ def is_medium_disintegration_polymer(polymer):
     low_disintegration = ['LDPE', 'PP', 'EVOH', 'PA', 'PET', 'PVDC', 'Bio-PE', 'PLA']
     return not any(x in polymer.upper() for x in low_disintegration)
 
+def should_get_synergistic_boost(polymer):
+    """Determine if a polymer should get synergistic boost when blended with home-compostable materials"""
+    # Petroleum-based polymers that should NOT get boost
+    petroleum_polymers = ['LDPE', 'PP', 'EVOH', 'PA', 'PET', 'PVDC', 'BIO-PE']
+    
+    # Check if it's a petroleum-based polymer
+    is_petroleum = any(x in polymer.upper() for x in petroleum_polymers)
+    
+    # All biopolymers (including PLA) should get synergistic boost
+    # Only petroleum-based polymers are excluded
+    return not is_petroleum
+
 def get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed=None):
     """Determine maximum disintegration percentage: TUV Home certification takes priority, then polymer type"""
     # Set seed for this specific material if provided
@@ -198,7 +210,7 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
     should_get_boost = (
         not is_home_compostable and  # Not home-compostable certified
         home_fraction_in_blend > 0 and  # There are home-compostable materials in blend
-        is_medium_disintegration_polymer(polymer)  # Only medium disintegrating polymers (removed PLA)
+        should_get_synergistic_boost(polymer)  # All biopolymers (including PLA) get boost, petroleum-based don't
     )
     
     if is_home_compostable:
@@ -220,31 +232,37 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
         # Not home-compostable certified: use hybrid classification
         max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         
-        if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
-            y = np.full_like(t, max_disintegration)
-        else:
-            k = 0.02
-            t0 = 120
+        # Apply synergistic boost if eligible (BEFORE checking disintegration threshold)
+        if should_get_boost:
+            # Use home-compostable kinetics but with proportional max disintegration boost
+            base_k = 0.08
+            base_t0 = 70
             
-            # Apply synergistic boost if eligible
-            if should_get_boost:
-                # Use home-compostable kinetics but with proportional max disintegration boost
-                base_k = 0.08
-                base_t0 = 70
-                
-                # Apply thickness effect like home-compostable materials
-                thickness_factor = (thickness_val / 1.0) ** 0.1
-                k = base_k * thickness_factor
-                t0 = base_t0 / thickness_factor
-                
-                # Proportional max disintegration boost based on home-compostable fraction
-                max_boost_percent = 20  # Maximum 20% boost
-                actual_boost = max_boost_percent * home_fraction_in_blend  # Proportional to home fraction
-                max_disintegration = min(max_disintegration + actual_boost, 95)  # Cap at 95%
-                
-                print(f"    Synergistic boost applied to {polymer} {grade}: +{actual_boost:.1f}% max ({home_fraction_in_blend:.1%} of max), using home-compostable kinetics")
+            # Apply thickness effect like home-compostable materials
+            thickness_factor = (thickness_val / 1.0) ** 0.1
+            k = base_k * thickness_factor
+            t0 = base_t0 / thickness_factor
+            
+            # Proportional max disintegration boost based on home-compostable fraction
+            if 'PLA' in polymer.upper():
+                max_boost_percent = 100  # PLA gets much bigger boost (up to 90%)
+            else:
+                max_boost_percent = 10  # Other polymers get smaller boost (up to 10%)
+            
+            actual_boost = max_boost_percent * home_fraction_in_blend  # Proportional to home fraction
+            max_disintegration = min(max_disintegration + actual_boost, 95)  # Cap at 95%
+            
+            print(f"    Synergistic boost applied to {polymer} {grade}: +{actual_boost:.1f}% max ({home_fraction_in_blend:.1%} of max), using home-compostable kinetics")
             
             y = sigmoid(t, max_disintegration, k, t0)
+        else:
+            # No synergistic boost - use standard logic
+            if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
+                y = np.full_like(t, max_disintegration)
+            else:
+                k = 0.02
+                t0 = 120
+                y = sigmoid(t, max_disintegration, k, t0)
         
         print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
     
