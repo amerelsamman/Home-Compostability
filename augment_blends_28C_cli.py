@@ -142,6 +142,15 @@ def run_streamlit_app():
                 # Show the plot
                 st.image(temp_output, caption="Generated Blend Curve", use_container_width=True)
                 
+                # Add download button for the plot
+                with open(temp_output, "rb") as file:
+                    st.download_button(
+                        label="📥 Download Plot (PNG)",
+                        data=file.read(),
+                        file_name="blend_disintegration_curve.png",
+                        mime="image/png"
+                    )
+                
                 # Display material information
                 st.subheader("📊 Material Information")
                 for i, (material, vol_frac) in enumerate(zip(selected_materials, volume_fractions)):
