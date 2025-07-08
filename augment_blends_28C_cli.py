@@ -34,11 +34,90 @@ def parse_arguments():
 # --- STREAMLIT APP ---
 def run_streamlit_app():
     import streamlit as st
+
+    # THIS MUST BE FIRST!
+    st.set_page_config(
+        page_title="Polymer Blend Disintegration Model",
+        page_icon="🌱",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+
+    # Set dark background for the whole app
+    st.markdown("""
+    <style>
+    body, .stApp, .main, .block-container, .css-18e3th9, .css-1d391kg, .css-1v0mbdj, .css-1dp5vir, .css-1cpxqw2, .css-ffhzg2, .css-1outpf7, .css-1lcbmhc, .css-1vq4p4l, .css-1wrcr25, .css-1b2g3b5, .css-1v3fvcr, .css-1q8dd3e, .css-1r6slb0, .css-1vzeuhh, .css-1cypcdb, .css-1vzeuhh, .css-1b2g3b5, .css-1v3fvcr, .css-1q8dd3e, .css-1r6slb0, .css-1vzeuhh, .css-1cypcdb, .css-1vzeuhh, .css-1b2g3b5, .css-1v3fvcr, .css-1q8dd3e, .css-1r6slb0, .css-1vzeuhh, .css-1cypcdb {
+        background-color: #000000 !important;
+        color: #FFFFFF !important;
+    }
+    .stMarkdown, .stText, .stTitle, .stHeader, .stSubheader, .stCaption, .stDataFrame, .stTable, .stMetric, .stButton, .stDownloadButton, .stSelectbox, .stNumberInput, .stAlert, .stSuccess, .stError, .stWarning, .stInfo, .stRadio, .stCheckbox, .stSlider, .stTextInput, .stTextArea, .stDateInput, .stTimeInput, .stColorPicker, .stFileUploader, .stImage, .stAudio, .stVideo, .stJson, .stCode, .stException, .stHelp, .stExpander, .stTabs, .stTab, .stSidebar, .stSidebarContent, .stSidebarNav, .stSidebarNavItem, .stSidebarNavLink, .stSidebarNavLinkActive, .stSidebarNavLinkInactive, .stSidebarNavLinkSelected, .stSidebarNavLinkUnselected, .stSidebarNavLinkDisabled, .stSidebarNavLinkIcon, .stSidebarNavLinkLabel, .stSidebarNavLinkLabelText, .stSidebarNavLinkLabelIcon, .stSidebarNavLinkLabelIconActive, .stSidebarNavLinkLabelIconInactive, .stSidebarNavLinkLabelIconSelected, .stSidebarNavLinkLabelIconUnselected, .stSidebarNavLinkLabelIconDisabled, .stSidebarNavLinkLabelIconActive, .stSidebarNavLinkLabelIconInactive, .stSidebarNavLinkLabelIconSelected, .stSidebarNavLinkLabelIconUnselected, .stSidebarNavLinkLabelIconDisabled, .stSidebarNavLinkLabelIconActive, .stSidebarNavLinkLabelIconInactive, .stSidebarNavLinkLabelIconSelected, .stSidebarNavLinkLabelIconUnselected, .stSidebarNavLinkLabelIconDisabled {
+        color: #FFFFFF !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Aggressive green button CSS
+    st.markdown("""
+    <style>
+    button[kind='primary'],
+    button[kind='primary']:hover,
+    button[kind='primary']:focus,
+    button[kind='primary']:active,
+    button[kind='primary']:focus-visible,
+    button[kind='primary']:focus-within,
+    button[kind='primary']:focus:not(:active),
+    .stButton > button[kind='primary'],
+    .stButton > button[kind='primary']:hover,
+    .stButton > button[kind='primary']:focus,
+    .stButton > button[kind='primary']:active,
+    .stButton > button[kind='primary']:focus-visible,
+    .stButton > button[kind='primary']:focus-within,
+    .stButton > button[kind='primary']:focus:not(:active),
+    div[data-testid='stButton'] > button[kind='primary'],
+    div[data-testid='stButton'] > button[kind='primary']:hover,
+    div[data-testid='stButton'] > button[kind='primary']:focus,
+    div[data-testid='stButton'] > button[kind='primary']:active,
+    div[data-testid='stButton'] > button[kind='primary']:focus-visible,
+    div[data-testid='stButton'] > button[kind='primary']:focus-within,
+    div[data-testid='stButton'] > button[kind='primary']:focus:not(:active) {
+        background-color: #2E8B57 !important;
+        border-color: #2E8B57 !important;
+        color: white !important;
+        font-weight: 600 !important;
+        outline: none !important;
+        box-shadow: none !important;
+        border: 2px solid #2E8B57 !important;
+    }
+    button[kind='primary']:hover,
+    .stButton > button[kind='primary']:hover,
+    div[data-testid='stButton'] > button[kind='primary']:hover {
+        background-color: #3CB371 !important;
+        border-color: #3CB371 !important;
+        border: 2px solid #3CB371 !important;
+    }
+    button[kind='primary']:active,
+    .stButton > button[kind='primary']:active,
+    div[data-testid='stButton'] > button[kind='primary']:active {
+        background-color: #228B22 !important;
+        border-color: #228B22 !important;
+        border: 2px solid #228B22 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    st.set_page_config(page_title="Polymer Blend Disintegration Generator", layout="wide")
+    # Force all Streamlit widget labels to be white
+    st.markdown("""
+    <style>
+    label, .stSelectbox label, .stNumberInput label, .css-1cpxqw2, .css-1v3fvcr, .css-1q8dd3e, .css-1r6slb0 {
+        color: #FFFFFF !important;
+        font-weight: 500 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    st.title("🎯 Polymer Blend Disintegration Generator at 28°C")
-    st.markdown("Generate disintegration curves for custom polymer blends using the same physics as the CLI version.")
+    # Professional header
+    st.markdown('<h1 class="main-header">🌱 Polymer Blend Disintegration Model</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Advanced physics-based modeling for home-compostable polymer blends at 28°C</p>', unsafe_allow_html=True)
     
     # Load available materials
     material_options = []
@@ -53,7 +132,7 @@ def run_streamlit_app():
         
         # Check if home-compostable
         is_home = is_home_compostable_certified(tuv_home)
-        home_status = " (HOME)" if is_home else " (NON-HOME)"
+        home_status = " 🌿" if is_home else " ⚗️"
         display_name = f"{polymer} - {grade}{home_status}"
         
         material_options.append({
@@ -64,114 +143,120 @@ def run_streamlit_app():
             'row_data': row
         })
     
-    # Create material selection interface
-    st.header("📋 Material Selection")
-    
-    col1, col2 = st.columns([2, 1])
+    # Main interface - 35% left for selection, 65% right for plot
+    col1, col2 = st.columns([35, 65])
     
     with col1:
-        st.subheader("Select Materials (up to 5)")
+        st.markdown("### Material Selection")
         
         selected_materials = []
         volume_fractions = []
         
+        # Material selection interface
         for i in range(5):
-            col_a, col_b = st.columns([3, 1])
+            cols = st.columns([3, 1])
             
-            with col_a:
-                material_key = f"material_{i}"
+            with cols[0]:
                 material_selection = st.selectbox(
                     f"Material {i+1}",
                     options=[""] + [opt['display'] for opt in material_options],
-                    key=material_key
+                    key=f"material_{i}"
                 )
             
-            with col_b:
-                vol_frac_key = f"vol_frac_{i}"
+            with cols[1]:
                 vol_frac = st.number_input(
-                    "Volume Fraction",
+                    "Fraction",
                     min_value=0.0,
                     max_value=1.0,
                     value=0.0,
                     step=0.05,
-                    key=vol_frac_key
+                    key=f"vol_frac_{i}"
                 )
             
             if material_selection and vol_frac > 0:
                 selected_material = next(opt for opt in material_options if opt['display'] == material_selection)
                 selected_materials.append(selected_material)
                 volume_fractions.append(vol_frac)
+        
+        # Volume fraction validation
+        total_vol_frac = sum(volume_fractions)
+        if selected_materials:
+            if abs(total_vol_frac - 1.0) <= 0.01:
+                st.success(f"✅ Total: {total_vol_frac:.2f}")
+            else:
+                st.error(f"❌ Total: {total_vol_frac:.2f} (should be 1.0)")
+        
+        # Generate button
+        if st.button("🚀 Generate Disintegration Curve", type="primary"):
+            if not selected_materials:
+                st.error("Please select at least one material.")
+            elif abs(total_vol_frac - 1.0) > 0.01:
+                st.error("Volume fractions must sum to 1.0.")
+            else:
+                # Create blend string
+                blend_parts = []
+                for material, vol_frac in zip(selected_materials, volume_fractions):
+                    blend_parts.extend([material['grade'], str(vol_frac)])
+                blend_string = ",".join(blend_parts)
+                
+                try:
+                    # Generate curve
+                    temp_output = "temp_blend_curve.png"
+                    generate_custom_blend_curves([blend_string], temp_output)
+                    
+                    # Store the result for display in the right column
+                    st.session_state['plot_generated'] = True
+                    st.session_state['temp_output'] = temp_output
+                    st.session_state['selected_materials'] = selected_materials
+                    st.session_state['volume_fractions'] = volume_fractions
+                    
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+        
+
     
     with col2:
-        st.subheader("Instructions")
-        st.markdown("""
-        1. **Select up to 5 materials** from the dropdowns
-        2. **Set volume fractions** (should sum to 1.0)
-        3. **Click Generate** to see the blend curve
+        st.markdown("### Results")
         
-        """)
-    
-    # Validate volume fractions
-    total_vol_frac = sum(volume_fractions)
-    if selected_materials and abs(total_vol_frac - 1.0) > 0.01:
-        st.warning(f"⚠️ Volume fractions should sum to 1.0 (currently: {total_vol_frac:.2f})")
-    
-    # Generate button
-    if st.button("🚀 Generate Blend Curve", type="primary"):
-        if not selected_materials:
-            st.error("Please select at least one material.")
-        elif abs(total_vol_frac - 1.0) > 0.01:
-            st.error("Volume fractions must sum to 1.0.")
-        else:
-            # Create blend string for the CLI function
+        # Check if plot has been generated
+        if 'plot_generated' in st.session_state and st.session_state['plot_generated']:
+            # Display plot
+            st.image(st.session_state['temp_output'], use_container_width=True)
+            
+            # Download button
+            with open(st.session_state['temp_output'], "rb") as file:
+                st.download_button(
+                    label="📥 Download Plot",
+                    data=file.read(),
+                    file_name="polymer_blend_disintegration.png",
+                    mime="image/png"
+                )
+            
+            # Show only 90 day and 180 day values (for the first/only blend)
+            # Get the blend curve from the file or from the last calculation
+            # We'll recalculate it here for robustness
             blend_parts = []
-            for material, vol_frac in zip(selected_materials, volume_fractions):
+            for material, vol_frac in zip(st.session_state['selected_materials'], st.session_state['volume_fractions']):
                 blend_parts.extend([material['grade'], str(vol_frac)])
-            
             blend_string = ",".join(blend_parts)
+            from modules.blend_generator import generate_blend
+            _, blend_curve = generate_blend(blend_string)
             
-            # Generate the curve using the same function as CLI
-            try:
-                # Create a temporary output file
-                temp_output = "temp_blend_curve.png"
-                generate_custom_blend_curves([blend_string], temp_output)
-                
-                # Display results
-                st.success("✅ Blend curve generated successfully!")
-                
-                # Show the plot
-                st.image(temp_output, caption="Generated Blend Curve", use_container_width=True)
-                
-                # Add download button for the plot
-                with open(temp_output, "rb") as file:
-                    st.download_button(
-                        label="📥 Download Plot (PNG)",
-                        data=file.read(),
-                        file_name="blend_disintegration_curve.png",
-                        mime="image/png"
-                    )
-                
-                # Display material information
-                st.subheader("📊 Material Information")
-                for i, (material, vol_frac) in enumerate(zip(selected_materials, volume_fractions)):
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.write(f"**{material['polymer']} {material['grade']}**")
-                        st.write(f"Volume Fraction: {vol_frac:.1%}")
-                    
-                    with col2:
-                        is_home = is_home_compostable_certified(material['tuv_home'])
-                        st.write(f"Home-compostable: {'Yes' if is_home else 'No'}")
-                    
-                    with col3:
-                        thickness_val = parse_thickness(material['row_data'].get('Thickness 1', None))
-                        st.write(f"Thickness: {thickness_val:.3f} mm")
-                    
-                    st.divider()
-                
-            except Exception as e:
-                st.error(f"Error generating blend curve: {str(e)}")
+            value_90 = blend_curve[89] if len(blend_curve) > 89 else float('nan')
+            value_180 = blend_curve[179] if len(blend_curve) > 179 else float('nan')
+            
+            st.markdown(f"""
+            <div style='margin-top:2em;font-size:1.3em;'>
+                <b>mid-point (90 day):</b> {value_90:.1f}%<br>
+                <b>max (180 day):</b> {value_180:.1f}%
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            **Select materials and generate a curve to see results here.**
+            
+            The plot will appear in this area once you click "Generate Disintegration Curve".
+            """)
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
