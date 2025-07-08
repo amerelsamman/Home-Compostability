@@ -191,64 +191,44 @@ def run_streamlit_app():
                 st.error(f"❌ Total: {total_vol_frac:.2f} (should be 1.0)")
         
         # Generate button
-        if st.button("🚀 Generate Disintegration Curve", type="primary"):
+        generate_clicked = st.button("🚀 Generate Disintegration Curve", type="primary")
+        plot_ready = False
+        temp_output = None
+        blend_string = None
+        blend_curve = None
+        value_90 = value_180 = float('nan')
+        if generate_clicked:
             if not selected_materials:
                 st.error("Please select at least one material.")
             elif abs(total_vol_frac - 1.0) > 0.01:
                 st.error("Volume fractions must sum to 1.0.")
             else:
-                # Create blend string
                 blend_parts = []
                 for material, vol_frac in zip(selected_materials, volume_fractions):
                     blend_parts.extend([material['grade'], str(vol_frac)])
                 blend_string = ",".join(blend_parts)
-                
                 try:
-                    # Generate curve
                     temp_output = "temp_blend_curve.png"
                     generate_custom_blend_curves([blend_string], temp_output)
-                    
-                    # Store the result for display in the right column
-                    st.session_state['plot_generated'] = True
-                    st.session_state['temp_output'] = temp_output
-                    st.session_state['selected_materials'] = selected_materials
-                    st.session_state['volume_fractions'] = volume_fractions
-                    
+                    from modules.blend_generator import generate_blend
+                    _, blend_curve = generate_blend(blend_string)
+                    value_90 = blend_curve[89] if len(blend_curve) > 89 else float('nan')
+                    value_180 = blend_curve[179] if len(blend_curve) > 179 else float('nan')
+                    plot_ready = True
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
-        
 
-    
     with col2:
         st.markdown("### Results")
-        
-        # Check if plot has been generated
-        if 'plot_generated' in st.session_state and st.session_state['plot_generated']:
-            # Display plot
-            st.image(st.session_state['temp_output'], use_container_width=True)
-            
-            # Download button
-            with open(st.session_state['temp_output'], "rb") as file:
+        if plot_ready and temp_output:
+            st.image(temp_output, use_container_width=True)
+            with open(temp_output, "rb") as file:
                 st.download_button(
                     label="📥 Download Plot",
                     data=file.read(),
                     file_name="polymer_blend_disintegration.png",
                     mime="image/png"
                 )
-            
-            # Show only 90 day and 180 day values (for the first/only blend)
-            # Get the blend curve from the file or from the last calculation
-            # We'll recalculate it here for robustness
-            blend_parts = []
-            for material, vol_frac in zip(st.session_state['selected_materials'], st.session_state['volume_fractions']):
-                blend_parts.extend([material['grade'], str(vol_frac)])
-            blend_string = ",".join(blend_parts)
-            from modules.blend_generator import generate_blend
-            _, blend_curve = generate_blend(blend_string)
-            
-            value_90 = blend_curve[89] if len(blend_curve) > 89 else float('nan')
-            value_180 = blend_curve[179] if len(blend_curve) > 179 else float('nan')
-            
             st.markdown(f"""
             <div style='margin-top:2em;font-size:1.3em;'>
                 <b>mid-point (90 day):</b> {value_90:.1f}%<br>

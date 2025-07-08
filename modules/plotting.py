@@ -48,7 +48,7 @@ def generate_custom_blend_curves(blend_strings, output_filename):
             color = colors[i % len(colors)]
             x = np.arange(1, DAYS+1)
             y = curve
-            ax.plot(x, y, label=label, linewidth=4, color=color)
+            ax.plot(x, y, label=label, linewidth=2, color=color)
             print(f"Plotted: {label} (max: {np.max(y):.1f}%, 90d: {y[89]:.1f}%)")
         # Set axis and title colors
         ax.tick_params(colors='white', which='both')
