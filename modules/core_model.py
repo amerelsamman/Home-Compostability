@@ -264,7 +264,7 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
             if 'PLA' in polymer.upper():
                 max_boost_percent = 100  # PLA gets much bigger boost (up to 90%)
             else:
-                max_boost_percent = 10  # Other polymers get smaller boost (up to 10%)
+                max_boost_percent = 15  # Other polymers get smaller boost (up to 10%)
             
             actual_boost = max_boost_percent * home_fraction_in_blend  # Proportional to home fraction
             max_disintegration = min(max_disintegration + actual_boost, 95)  # Cap at 95%

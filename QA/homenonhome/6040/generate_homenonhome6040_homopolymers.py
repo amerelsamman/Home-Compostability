@@ -66,7 +66,7 @@ def filter_medium_disintegration_materials(sus_data):
     return medium_disintegration
 
 def generate_blend_curves():
-    """Generate time-series curves for all 70:30 home-nonhome blends"""
+    """Generate time-series curves for all 60:40 home-nonhome blends"""
     
     # Filter for home-compostable and medium-disintegration materials
     home_compostable_sus = filter_home_compostable_materials(sus)
@@ -74,7 +74,7 @@ def generate_blend_curves():
     
     print(f"Found {len(home_compostable_sus)} home-compostable certified materials")
     print(f"Found {len(medium_disintegration_sus)} medium-disintegration materials")
-    print(f"Total possible 70:30 blends: {len(home_compostable_sus) * len(medium_disintegration_sus)}")
+    print(f"Total possible 60:40 blends: {len(home_compostable_sus) * len(medium_disintegration_sus)}")
     
     # Create figure for all blend curves
     plt.figure(figsize=(15, 10))
@@ -98,8 +98,8 @@ def generate_blend_curves():
             # Use a unique seed for each blend
             material_seed = hash(f"{home_polymer}_{home_grade}_{nonhome_polymer}_{nonhome_grade}") % (2**32)
             
-            # Generate synergistic curve for the non-home component (70% home, 30% non-home)
-            home_fraction = 0.7  # 70% home-compostable
+            # Generate synergistic curve for the non-home component (60% home, 40% non-home)
+            home_fraction = 0.6  # 60% home-compostable
             curve = generate_material_curve_with_synergistic_boost(
                 nonhome_polymer, nonhome_grade, nonhome_tuv_home, nonhome_thickness, 
                 home_fraction, material_seed=material_seed
@@ -110,24 +110,24 @@ def generate_blend_curves():
             color = cmap(blend_count / (len(home_compostable_sus) * len(medium_disintegration_sus)))
             
             plt.plot(days, curve, color=color, linewidth=2,
-                    label=f"70%{home_polymer}-30%{nonhome_polymer} (90d: {curve[89]:.1f}%, max: {curve[-1]:.1f}%)")
+                    label=f"60%{home_polymer}-40%{nonhome_polymer} (90d: {curve[89]:.1f}%, max: {curve[-1]:.1f}%)")
             
-            print(f"Generated blend {blend_count+1}: 70%{home_polymer}-30%{nonhome_polymer}: max={curve[-1]:.1f}%")
+            print(f"Generated blend {blend_count+1}: 60%{home_polymer}-40%{nonhome_polymer}: max={curve[-1]:.1f}%")
             blend_count += 1
     
     plt.xlabel('Time (days)')
     plt.ylabel('Disintegration (%)')
-    plt.title('70:30 Home-Nonhome Blend Curves at 28°C (Synergistic Boost Effect)')
+    plt.title('60:40 Home-Nonhome Blend Curves at 28°C (Synergistic Boost Effect)')
     plt.ylim(0, 100)
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     
     # Save plot
-    plt.savefig('home_nonhome7030_blends.png', dpi=300, bbox_inches='tight')
-    print(f"Saved plot to: home_nonhome7030_blends.png")
+    plt.savefig('home_nonhome6040_blends.png', dpi=300, bbox_inches='tight')
+    print(f"Saved plot to: home_nonhome6040_blends.png")
 
 if __name__ == "__main__":
-    print("=== GENERATING 90:10 HOME-NONHOME BLEND CURVES (SYNERGISTIC BOOST EFFECT) ===")
+    print("=== GENERATING 60:40 HOME-NONHOME BLEND CURVES (SYNERGISTIC BOOST EFFECT) ===")
     generate_blend_curves()
     print("Done!") 
