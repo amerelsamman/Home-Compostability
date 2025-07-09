@@ -128,13 +128,13 @@ def get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_see
         else:
             result = np.random.uniform(10, 30)
     
-    # Reset to global seed
-    np.random.seed(GLOBAL_SEED)
+    # Remove global seed reset to allow different random values each run
+    # np.random.seed(GLOBAL_SEED)
     return result
 
 def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, material_seed=None):
     """Generate disintegration curve for a single material based ONLY on TUV Home certification"""
-    t = np.arange(1, days+1)
+    t = np.arange(0, days)  # Start at 0 instead of 1
     
     # Use ONLY the TUV Home certification data - NO HARDWIRED LOGIC
     is_home_compostable = is_home_compostable_certified(tuv_home)
@@ -163,11 +163,28 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, 
         max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
         
         if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
-            y = np.full_like(t, max_disintegration)
+            # Linear progression from 0 to max_disintegration with some randomness
+            y = np.linspace(0, max_disintegration, len(t))
+            
+            # Add small random variations to make it more realistic
+            if material_seed is not None:
+                np.random.seed(material_seed + 500)  # Different seed for linear noise
+            noise = np.random.normal(0, 0.05, size=y.shape)  # Small noise
+            y = y + noise
+            
+            # Ensure it stays monotonically increasing and within bounds
+            y = np.clip(y, 0, max_disintegration)
+            for i in range(1, len(y)):
+                if y[i] < y[i-1]:
+                    y[i] = y[i-1] + np.random.uniform(0, 0.01)
         else:
             k = 0.02
             t0 = 120
             y = sigmoid(t, max_disintegration, k, t0)
+            
+            # Shift curve to start at 0 by subtracting the initial value
+            y0 = sigmoid(0, max_disintegration, k, t0)
+            y = y - y0
         
         print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
     
@@ -197,7 +214,7 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, 
 
 def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thickness_val, home_fraction_in_blend, days=DAYS, material_seed=None):
     """Generate disintegration curve for a single material with synergistic boost from home-compostable materials"""
-    t = np.arange(1, days+1)
+    t = np.arange(0, days)  # Start at 0 instead of 1
     
     # Use ONLY the TUV Home certification data - NO HARDWIRED LOGIC
     is_home_compostable = is_home_compostable_certified(tuv_home)
@@ -258,11 +275,28 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
         else:
             # No synergistic boost - use standard logic
             if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
-                y = np.full_like(t, max_disintegration)
+                # Linear progression from 0 to max_disintegration with some randomness
+                y = np.linspace(0, max_disintegration, len(t))
+                
+                # Add small random variations to make it more realistic
+                if material_seed is not None:
+                    np.random.seed(material_seed + 500)  # Different seed for linear noise
+                noise = np.random.normal(0, 0.05, size=y.shape)  # Small noise
+                y = y + noise
+                
+                # Ensure it stays monotonically increasing and within bounds
+                y = np.clip(y, 0, max_disintegration)
+                for i in range(1, len(y)):
+                    if y[i] < y[i-1]:
+                        y[i] = y[i-1] + np.random.uniform(0, 0.01)
             else:
                 k = 0.02
                 t0 = 120
                 y = sigmoid(t, max_disintegration, k, t0)
+                
+                # Shift curve to start at 0 by subtracting the initial value
+                y0 = sigmoid(0, max_disintegration, k, t0)
+                y = y - y0
         
         print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
     
