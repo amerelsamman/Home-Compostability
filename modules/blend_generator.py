@@ -7,7 +7,7 @@ from .core_model import (
     parse_blend_input, is_home_compostable_certified, is_medium_disintegration_polymer, GLOBAL_SEED
 )
 
-def generate_blend(blend_str):
+def generate_blend(blend_str, actual_thickness=None):
     """Generate a blend - core function used by both CSV and plotting"""
     materials = parse_blend_input(blend_str)
     
@@ -17,7 +17,6 @@ def generate_blend(blend_str):
         material_row = find_material_by_grade(sus, mat['grade'])
         if material_row is not None:
             thickness_val = parse_thickness(material_row.get('Thickness 1', None))
-            
             material_info.append({
                 'polymer': material_row['Polymer Category'],
                 'grade': material_row['Grade'],
@@ -25,46 +24,37 @@ def generate_blend(blend_str):
                 'tuv_home': str(material_row.get('TUV Home', '')),
                 'thickness': thickness_val
             })
-    
     if not material_info:
         raise ValueError("No valid materials found for blend")
-    
     # Calculate home-compostable fraction in the blend
     home_fraction = sum(mat['vol_frac'] for mat in material_info if is_home_compostable_certified(mat['tuv_home']))
-    
     # Generate curves with synergistic effects using material-specific seeds
     for i, material in enumerate(material_info):
         # Create a deterministic seed for each material based on its grade
         material_seed = hash(material['grade']) % 2**32
-        
         material['curve'] = generate_material_curve_with_synergistic_boost(
             material['polymer'],
             material['grade'],
             material['tuv_home'],
             material['thickness'],
             home_fraction,
-            material_seed=material_seed
+            material_seed=material_seed,
+            actual_thickness=actual_thickness
         )
-    
     # Calculate blend curve
     blend_curve = np.zeros(DAYS)
     for material in material_info:
         blend_curve += material['curve'] * material['vol_frac']
-    
     # Set seed for blend curve monotonicity
     np.random.seed(GLOBAL_SEED + 3000)  # Offset for blend curve adjustments
-    
     # Ensure blend curve is monotonically increasing
     for i in range(1, len(blend_curve)):
         if blend_curve[i] < blend_curve[i-1]:
             blend_curve[i] = blend_curve[i-1] + np.random.uniform(0, 0.01)  # Very small positive increment
-    
     # No clipping - let sigmoid handle everything naturally
     blend_curve = np.clip(blend_curve, 0, None)
-    
     # Reset to global seed
     np.random.seed(GLOBAL_SEED)
-    
     return material_info, blend_curve
 
 def generate_csv_for_single_blend(blend_str, output_path):

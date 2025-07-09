@@ -20,6 +20,7 @@ set_global_seed(GLOBAL_SEED)
 DAYS = 200  # Number of days for the time series
 SAMPLE_AREA = 100.0  # Default sample area (mm^2)
 THICKNESS_DEFAULT = 1.0  # Default thickness (mm)
+ACTUAL_THICKNESS_DEFAULT = 0.050  # Default actual thickness (50 μm = 0.050 mm)
 
 # --- LOAD DATA ---
 sus = pd.read_csv('sustainability.csv')
@@ -28,6 +29,78 @@ sus.columns = [c.strip() for c in sus.columns]
 # --- SIGMOID FUNCTION ---
 def sigmoid(t, L, k, t0):
     return L / (1 + np.exp(-k * (t - t0)))
+
+def calculate_certification_thickness_scaling(certification_thickness):
+    """
+    Calculate thickness scaling factor based on certification thickness (original model behavior).
+    
+    Args:
+        certification_thickness: Thickness from certification data (mm)
+    
+    Returns:
+        scaling_factor: Factor to apply to kinetics based on certification thickness
+    """
+    # Ensure certification thickness is valid
+    if np.isnan(certification_thickness) or certification_thickness <= 0:
+        certification_thickness = THICKNESS_DEFAULT
+    
+    # Original model scaling: (certification_thickness / 1.0) ** 0.1
+    scaling_factor = (certification_thickness / 1.0) ** 0.1
+    
+    return scaling_factor
+
+def calculate_actual_thickness_scaling(actual_thickness=None):
+    """
+    Calculate thickness scaling factor based on actual thickness input.
+    
+    Args:
+        actual_thickness: Actual thickness of material (mm), defaults to 50μm
+    
+    Returns:
+        scaling_factor: Factor to apply to kinetics (50μm = 1.0, thinner = <1.0, thicker = >1.0)
+    """
+    if actual_thickness is None:
+        actual_thickness = ACTUAL_THICKNESS_DEFAULT
+    
+    # Ensure actual thickness is valid
+    if np.isnan(actual_thickness) or actual_thickness <= 0:
+        actual_thickness = ACTUAL_THICKNESS_DEFAULT
+    
+    # Scaling factor: (actual_thickness / 50μm) ** 0.1 (gentler power law)
+    # When actual = 50μm: scaling = 1.0
+    # When actual < 50μm: scaling < 1.0 (faster kinetics)
+    # When actual > 50μm: scaling > 1.0 (slower kinetics)
+    scaling_factor = (actual_thickness / ACTUAL_THICKNESS_DEFAULT) ** 0.1
+    
+    return scaling_factor
+
+def calculate_max_disintegration_modulation(actual_thickness=None):
+    """
+    Calculate max disintegration modulation based on actual thickness.
+    
+    Args:
+        actual_thickness: Actual thickness of material (mm), defaults to 50μm
+    
+    Returns:
+        modulation_factor: Factor to multiply max disintegration (thinner = higher max)
+    """
+    if actual_thickness is None:
+        actual_thickness = ACTUAL_THICKNESS_DEFAULT
+    
+    # Ensure actual thickness is valid
+    if np.isnan(actual_thickness) or actual_thickness <= 0:
+        actual_thickness = ACTUAL_THICKNESS_DEFAULT
+    
+    # Modulation factor: (50μm / actual_thickness) ** 0.1 (gentler power law)
+    # When actual = 50μm: modulation = 1.0
+    # When actual < 50μm: modulation > 1.0 (higher max disintegration)
+    # When actual > 50μm: modulation < 1.0 (lower max disintegration)
+    modulation_factor = (ACTUAL_THICKNESS_DEFAULT / actual_thickness) ** 0.1
+    
+    # Clamp to reasonable bounds (0.5 to 2.0)
+    modulation_factor = np.clip(modulation_factor, 0.5, 2.0)
+    
+    return modulation_factor
 
 def parse_blend_input(blend_str):
     """Parse blend input string like '4032D,0.5,Ecoworld,0.5'"""
@@ -132,61 +205,67 @@ def get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_see
     # np.random.seed(GLOBAL_SEED)
     return result
 
-def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, material_seed=None):
+def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, material_seed=None, actual_thickness=None):
     """Generate disintegration curve for a single material based ONLY on TUV Home certification"""
     t = np.arange(0, days)  # Start at 0 instead of 1
     
     # Use ONLY the TUV Home certification data - NO HARDWIRED LOGIC
     is_home_compostable = is_home_compostable_certified(tuv_home)
     
-    # Ensure thickness is valid
-    if np.isnan(thickness_val) or thickness_val <= 0:
-        thickness_val = THICKNESS_DEFAULT
+    # Calculate scaling factors
+    cert_scaling = calculate_certification_thickness_scaling(thickness_val)
+    actual_scaling = calculate_actual_thickness_scaling(actual_thickness)
+    max_modulation = calculate_max_disintegration_modulation(actual_thickness)
     
     if is_home_compostable:
         # Home-compostable certified: sigmoid curve with high disintegration
         base_k = 0.08
         base_t0 = 70
         
-        # Reduced thickness effect for very thin materials
-        thickness_factor = (thickness_val / 1.0) ** 0.1  # Much smaller thickness effect
-        k = base_k * thickness_factor
-        t0 = base_t0 / thickness_factor
+        # Apply both certification and actual thickness scaling to kinetics
+        k = base_k * cert_scaling / actual_scaling
+        t0 = base_t0 / cert_scaling * actual_scaling
         
-        # Use hybrid maximum disintegration (certification takes priority)
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        # Use hybrid maximum disintegration (certification takes priority) and apply thickness modulation
+        base_max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        max_disintegration = base_max_disintegration * max_modulation
+        max_disintegration = min(max_disintegration, 95)  # Cap at 95%
         y = sigmoid(t, max_disintegration, k, t0)
         
-        print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% - Thickness: {thickness_val:.3f}mm")
+        actual_thickness_display = actual_thickness if actual_thickness is not None else ACTUAL_THICKNESS_DEFAULT
+        print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% (base: {base_max_disintegration:.1f}%, modulation: {max_modulation:.2f}x) - Cert thickness: {thickness_val:.3f}mm, Actual: {actual_thickness_display:.3f}mm, k_scaling: {cert_scaling:.2f}/{actual_scaling:.2f}")
     else:
         # Not home-compostable certified: use hybrid classification
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
-        
+        cert_scaling = calculate_certification_thickness_scaling(thickness_val)
+        actual_scaling = calculate_actual_thickness_scaling(actual_thickness)
+        max_modulation = calculate_max_disintegration_modulation(actual_thickness)
+        base_max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        max_disintegration = base_max_disintegration * max_modulation
+        max_disintegration = min(max_disintegration, 95)  # Cap at 95%
         if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
             # Linear progression from 0 to max_disintegration with some randomness
             y = np.linspace(0, max_disintegration, len(t))
-            
             # Add small random variations to make it more realistic
             if material_seed is not None:
                 np.random.seed(material_seed + 500)  # Different seed for linear noise
             noise = np.random.normal(0, 0.05, size=y.shape)  # Small noise
             y = y + noise
-            
             # Ensure it stays monotonically increasing and within bounds
             y = np.clip(y, 0, max_disintegration)
             for i in range(1, len(y)):
                 if y[i] < y[i-1]:
                     y[i] = y[i-1] + np.random.uniform(0, 0.01)
         else:
-            k = 0.02
-            t0 = 120
+            base_k = 0.02
+            base_t0 = 120
+            k = base_k * cert_scaling / actual_scaling
+            t0 = base_t0 / cert_scaling * actual_scaling
             y = sigmoid(t, max_disintegration, k, t0)
-            
             # Shift curve to start at 0 by subtracting the initial value
             y0 = sigmoid(0, max_disintegration, k, t0)
             y = y - y0
-        
-        print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
+        actual_thickness_display = actual_thickness if actual_thickness is not None else ACTUAL_THICKNESS_DEFAULT
+        print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% (base: {base_max_disintegration:.1f}%, modulation: {max_modulation:.2f}x) - Cert thickness: {thickness_val:.3f}mm, Actual: {actual_thickness_display:.3f}mm, k_scaling: {cert_scaling:.2f}/{actual_scaling:.2f}")
     
     # Set seed for noise generation
     if material_seed is not None:
@@ -212,16 +291,17 @@ def generate_material_curve(polymer, grade, tuv_home, thickness_val, days=DAYS, 
     np.random.seed(GLOBAL_SEED)
     return y
 
-def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thickness_val, home_fraction_in_blend, days=DAYS, material_seed=None):
+def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thickness_val, home_fraction_in_blend, days=DAYS, material_seed=None, actual_thickness=None):
     """Generate disintegration curve for a single material with synergistic boost from home-compostable materials"""
     t = np.arange(0, days)  # Start at 0 instead of 1
     
     # Use ONLY the TUV Home certification data - NO HARDWIRED LOGIC
     is_home_compostable = is_home_compostable_certified(tuv_home)
     
-    # Ensure thickness is valid
-    if np.isnan(thickness_val) or thickness_val <= 0:
-        thickness_val = THICKNESS_DEFAULT
+    # Calculate scaling factors
+    cert_scaling = calculate_certification_thickness_scaling(thickness_val)
+    actual_scaling = calculate_actual_thickness_scaling(actual_thickness)
+    max_modulation = calculate_max_disintegration_modulation(actual_thickness)
     
     # Check if this material should get a synergistic boost
     should_get_boost = (
@@ -231,74 +311,54 @@ def generate_material_curve_with_synergistic_boost(polymer, grade, tuv_home, thi
     )
     
     if is_home_compostable:
-        # Home-compostable certified: sigmoid curve with high disintegration
         base_k = 0.08
         base_t0 = 70
-        
-        # Reduced thickness effect for very thin materials
-        thickness_factor = (thickness_val / 1.0) ** 0.1  # Much smaller thickness effect
-        k = base_k * thickness_factor
-        t0 = base_t0 / thickness_factor
-        
-        # Use hybrid maximum disintegration (certification takes priority)
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        k = base_k * cert_scaling / actual_scaling
+        t0 = base_t0 / cert_scaling * actual_scaling
+        base_max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        max_disintegration = base_max_disintegration * max_modulation
+        max_disintegration = min(max_disintegration, 95)  # Cap at 95%
         y = sigmoid(t, max_disintegration, k, t0)
-        
-        print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% - Thickness: {thickness_val:.3f}mm")
+        actual_thickness_display = actual_thickness if actual_thickness is not None else ACTUAL_THICKNESS_DEFAULT
+        print(f"    Home-compostable certified: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% (base: {base_max_disintegration:.1f}%, modulation: {max_modulation:.2f}x) - Cert thickness: {thickness_val:.3f}mm, Actual: {actual_thickness_display:.3f}mm, k_scaling: {cert_scaling:.2f}/{actual_scaling:.2f}")
     else:
-        # Not home-compostable certified: use hybrid classification
-        max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
-        
-        # Apply synergistic boost if eligible (BEFORE checking disintegration threshold)
+        base_max_disintegration = get_max_disintegration_hybrid(polymer, tuv_home, thickness_val, material_seed)
+        max_disintegration = base_max_disintegration * max_modulation
         if should_get_boost:
-            # Use home-compostable kinetics but with proportional max disintegration boost
             base_k = 0.08
             base_t0 = 70
-            
-            # Apply thickness effect like home-compostable materials
-            thickness_factor = (thickness_val / 1.0) ** 0.1
-            k = base_k * thickness_factor
-            t0 = base_t0 / thickness_factor
-            
+            k = base_k * cert_scaling / actual_scaling
+            t0 = base_t0 / cert_scaling * actual_scaling
             # Proportional max disintegration boost based on home-compostable fraction
             if 'PLA' in polymer.upper():
-                max_boost_percent = 100  # PLA gets much bigger boost (up to 90%)
+                max_boost_percent = 100
             else:
-                max_boost_percent = 15  # Other polymers get smaller boost (up to 10%)
-            
-            actual_boost = max_boost_percent * home_fraction_in_blend  # Proportional to home fraction
-            max_disintegration = min(max_disintegration + actual_boost, 95)  # Cap at 95%
-            
+                max_boost_percent = 15
+            actual_boost = max_boost_percent * home_fraction_in_blend
+            max_disintegration = min(max_disintegration + actual_boost, 95)
             print(f"    Synergistic boost applied to {polymer} {grade}: +{actual_boost:.1f}% max ({home_fraction_in_blend:.1%} of max), using home-compostable kinetics")
-            
             y = sigmoid(t, max_disintegration, k, t0)
         else:
-            # No synergistic boost - use standard logic
-            if max_disintegration < 5:  # Very low disintegration materials (petroleum-based)
-                # Linear progression from 0 to max_disintegration with some randomness
+            if max_disintegration < 5:
                 y = np.linspace(0, max_disintegration, len(t))
-                
-                # Add small random variations to make it more realistic
                 if material_seed is not None:
-                    np.random.seed(material_seed + 500)  # Different seed for linear noise
-                noise = np.random.normal(0, 0.05, size=y.shape)  # Small noise
+                    np.random.seed(material_seed + 500)
+                noise = np.random.normal(0, 0.05, size=y.shape)
                 y = y + noise
-                
-                # Ensure it stays monotonically increasing and within bounds
                 y = np.clip(y, 0, max_disintegration)
                 for i in range(1, len(y)):
                     if y[i] < y[i-1]:
                         y[i] = y[i-1] + np.random.uniform(0, 0.01)
             else:
-                k = 0.02
-                t0 = 120
+                base_k = 0.02
+                base_t0 = 120
+                k = base_k * cert_scaling / actual_scaling
+                t0 = base_t0 / cert_scaling * actual_scaling
                 y = sigmoid(t, max_disintegration, k, t0)
-                
-                # Shift curve to start at 0 by subtracting the initial value
                 y0 = sigmoid(0, max_disintegration, k, t0)
                 y = y - y0
-        
-        print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}%")
+        actual_thickness_display = actual_thickness if actual_thickness is not None else ACTUAL_THICKNESS_DEFAULT
+        print(f"    Not home-compostable: {polymer} {grade} - Max disintegration: {max_disintegration:.1f}% (base: {base_max_disintegration:.1f}%, modulation: {max_modulation:.2f}x) - Cert thickness: {thickness_val:.3f}mm, Actual: {actual_thickness_display:.3f}mm, k_scaling: {cert_scaling:.2f}/{actual_scaling:.2f}")
     
     # Set seed for noise generation
     if material_seed is not None:

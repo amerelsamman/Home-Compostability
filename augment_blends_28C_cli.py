@@ -190,6 +190,17 @@ def run_streamlit_app():
             else:
                 st.error(f"❌ Total: {total_vol_frac:.2f} (should be 1.0)")
         
+        # Global actual thickness input (μm)
+        actual_thickness_um = st.number_input(
+            "Actual Material Thickness (μm, global for all materials)",
+            min_value=1.0,
+            max_value=1000.0,
+            value=50.0,
+            step=1.0,
+            help="Leave at 50 μm for original model behavior, or adjust to see thickness effects."
+        )
+        actual_thickness_mm = actual_thickness_um / 1000.0
+        
         # Generate button
         generate_clicked = st.button("🚀 Generate Disintegration Curve", type="primary")
         plot_ready = False
@@ -209,9 +220,11 @@ def run_streamlit_app():
                 blend_string = ",".join(blend_parts)
                 try:
                     temp_output = "temp_blend_curve.png"
-                    generate_custom_blend_curves([blend_string], temp_output)
+                    # Only pass actual_thickness if user changed it from default
+                    actual_thickness_param = actual_thickness_mm if actual_thickness_um != 50.0 else None
+                    generate_custom_blend_curves([blend_string], temp_output, actual_thickness=actual_thickness_param)
                     from modules.blend_generator import generate_blend
-                    _, blend_curve = generate_blend(blend_string)
+                    _, blend_curve = generate_blend(blend_string, actual_thickness=actual_thickness_param)
                     value_90 = blend_curve[89] if len(blend_curve) > 89 else float('nan')
                     value_180 = blend_curve[179] if len(blend_curve) > 179 else float('nan')
                     plot_ready = True

@@ -8,7 +8,7 @@ from .core_model import (
 )
 from .blend_generator import generate_blend
 
-def generate_custom_blend_curves(blend_strings, output_filename):
+def generate_custom_blend_curves(blend_strings, output_filename, actual_thickness=None):
     """Generate curves for custom blends"""
     print("Generating custom blend curves...")
     
@@ -20,7 +20,7 @@ def generate_custom_blend_curves(blend_strings, output_filename):
             print(f"\nProcessing custom blend {i+1}: {blend_str}")
             
             # Use the core blend generation function
-            material_info, blend_curve = generate_blend(blend_str)
+            material_info, blend_curve = generate_blend(blend_str, actual_thickness=actual_thickness)
             
             custom_blend_curves.append(blend_curve)
             
